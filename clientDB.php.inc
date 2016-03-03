@@ -1,22 +1,31 @@
 <?php
+
+require_once("error.php.inc");
 class clientDB
 {
     private $db;
-    public function __construct()
+    private $salt;	
+    private $logger;
+    public function __construct($iniFile)
     {
-	$this->db = new mysqli("localhost","root","asdfasdf","it202");
-
+	$ini = parse_ini_file($iniFile,true);
+        $this->logger = new errorLogger("/var/log/it202.log");
+	$this->db = new mysqli(
+		$ini['loginDB']['host'],
+		$ini['loginDB']["user"],
+		$ini['loginDB']["password"],
+		$ini['loginDB']["db"]);
+	$this->salt = $ini['loginDB']['salt'];
 	if ($this->db->connect_errno > 0 )
 	{
-		echo __FILE__.__LINE__."failed to connect to database re: ".$this->db->connect_error.PHP_EOL;
+		$this->logger->log(__FILE__.__LINE__."failed to connect to database re: ".$this->db->connect_error);
 		exit(0);
 	}
-	echo "db connected!".PHP_EOL;
+	$this->logger->log("testing");
     }
     public function __destruct()
     {
 	$this->db->close();
-	echo "db closed".PHP_EOL;
     }
 
     public function getClientId($name)
@@ -25,7 +34,7 @@ class clientDB
 	$results = $this->db->query($query);
 	if (!$results)
 	{
-	    echo "error with results: ".$this->db->error.PHP_EOL;
+	    $this->logger->log("error with results: ".$this->db->error);
 	    return 0;
 	}
         $client = $results->fetch_assoc();
@@ -36,45 +45,56 @@ class clientDB
 	return 0;
     }
 
+    private function saltPassword($password)
+    {
+	return $this->db->real_escape_string(sha1($password.$this->salt));
+    }
+
     public function validateClient($name,$password)
     {
 	if ($this->getClientId($name) == 0)
         {
-	    echo "user $name does exists!!!!!".PHP_EOL;
-	    return false;
+	    return array("success"=>false,
+		"message"=>"user does not exist");
 	}
 	$query = "select * from clients where clientName='$name';";
 	$results = $this->db->query($query);
 	if (!$results)
 	{
-	    echo "error with results: ".$this->db->error.PHP_EOL;
-	    return false;
+	    return array("success"=>false,
+		"message"=>"db failure");
 	}
         $client = $results->fetch_assoc();
         {
-	    if ($client['clientPW'] == $password)
+	    if ($client['clientPW'] == $this->saltPassword($password))
 	    {
-		return true;
+		return array("success"=>true);
 	    }
         }
-        return false;
+        return array("success"=>false,"message"=>"failed to match password");
     }
 
     public function addNewClient($name,$password)
     {
 	if ($this->getClientId($name) != 0)
         {
-	    echo "user $name already exists!!!!!".PHP_EOL;
-	    return false;
+	    $this->logger->log("user $name already exists!!!!!");
+	    $response = array(
+		"message"=>"user $name already exists!",
+		"success"=>false
+		);
+	    return $response;
 	}
         $now = date("Y-m-d h:i:s",time());
+        $name = $this->db->real_escape_string($name);
+	$password = $this->saltPassword($password);
         $addQuery = "insert into clients (clientName,clientPW, firstLogin, lastLogin) values ('$name','$password','$now','$now');";
-	echo "executing statement: \n$addQuery".PHP_EOL;
         $results = $this->db->query($addQuery);
 	if (!$results)
 	{
-	    echo "error: ".$this->db->error.PHP_EOL;
+	    $this->logger->log("error: ".$this->db->error);
 	}
+	return array("success"=>true);
     }
 
 }

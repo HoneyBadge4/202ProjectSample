@@ -10,13 +10,13 @@ switch($command)
     case 'register':
 	$name = $argv[2];
 	$password = $argv[3];
-	$db = new clientDB();
+	$db = new clientDB("connect.ini");
 	$db->addNewClient($name,$password);
 	break;
     case 'login':
 	$name = $argv[2];
 	$password = $argv[3];
-	$db = new clientDB();
+	$db = new clientDB("connect.ini");
 	if ($db->validateClient($name,$password) == 0)
 	{
 		echo "invalid login!".PHP_EOL;
