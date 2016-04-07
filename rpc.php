@@ -2,13 +2,13 @@
 
 require_once("clientDB.php.inc");
 
-$request = $_POST['request'];
-$response = "FUCK<p>";
-switch($request)
+$request = json_decode(file_get_contents("php://input"),true);
+$response = "error unrecognized request<p>";
+switch($request["request"])
 {
     case "login":
-	$username = $_POST['username'];
-	$password = $_POST['password'];
+	$username = $request['username'];
+	$password = $request['password'];
 	$login = new clientDB("connect.ini");
 	$response = $login->validateClient($username,$password);
 	if ($response['success']===true)
@@ -22,5 +22,5 @@ switch($request)
 	break;
 }
 
-echo $response;
+echo json_encode($response);
 ?>
